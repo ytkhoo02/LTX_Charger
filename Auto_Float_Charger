@@ -1,0 +1,73 @@
+import pyvisa
+import time
+from datetime import datetime, timedelta
+
+# ---- CONFIGURATION ----
+RESOURCE_NAME = "TCPIP0::169.254.1.99::5025::SOCKET"
+CHANNEL = "1"  # Change to "2" if you're using channel 2
+CHARGE_VOLTAGE = 14.4  # Volts
+FLOAT_VOLTAGE = 13.8  # Volts
+CURRENT_LIMIT = 0.8  # Amps
+MIN_CURRENT_MA = 40  # mA
+MAX_CURRENT_MA = 80  # mA
+MAX_CHARGE_TIME_HOURS = 9
+
+# ------------------------
+
+def current_is_in_float_range(current_amps):
+    current_ma = current_amps * 1000
+    return MIN_CURRENT_MA <= current_ma <= MAX_CURRENT_MA
+
+rm = pyvisa.ResourceManager()
+psu = rm.open_resource(RESOURCE_NAME)
+
+# Confirm connection
+idn = psu.query("*IDN?")
+
+print(f"Connected to: {idn}")
+psu.write("*RST")  # Reset PSU from last config
+
+# Select channel
+psu.write(f"INSTrument:NSELect {CHANNEL}")
+
+# Configure for initial charge
+psu.write(f"VOLT {CHARGE_VOLTAGE}")
+psu.write(f"CURR {CURRENT_LIMIT}")
+psu.write("OUTP ON")
+
+start_time = datetime.now()
+print(f"[{start_time.strftime('%H:%M:%S')}] Charging started at {CHARGE_VOLTAGE}V")
+
+# Monitoring loop
+float_triggered = False
+while not float_triggered:
+    time.sleep(10)  # Check every 10 seconds
+
+    # Read output current
+    current = float(psu.query("MEAS:CURR?"))
+
+    # Check time elapsed
+    elapsed = datetime.now() - start_time
+    if elapsed >= timedelta(hours=MAX_CHARGE_TIME_HOURS):
+        print("[INFO] 9 hours elapsed. Switching to float mode.")
+        float_triggered = True
+
+    elif current_is_in_float_range(current):
+        print(f"[INFO] Current = {current*1000:.1f} mA. Switching to float mode.")
+        float_triggered = True
+
+# Switch to float voltage
+psu.write(f"VOLT {FLOAT_VOLTAGE}")
+print(f"[{datetime.now().strftime('%H:%M:%S')}] Now in float mode at {FLOAT_VOLTAGE}V")
+
+# Keep output on for float charging
+# You can optionally add a stop timer or monitor indefinitely
+try:
+    while True:
+        time.sleep(60)
+        current = float(psu.query("MEAS:CURR?"))
+        print(f"[FLOAT] Current: {current*1000:.1f} mA")
+except KeyboardInterrupt:
+    print("Exiting... turning off output.")
+    psu.write("OUTP OFF")
+    psu.close()
