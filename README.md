@@ -1,4 +1,8 @@
 # LTX_Charger
+Uses:
+- Python
+- LXI over LAN
+- SCPI
 
 Requirements 
 | Parameter            | Requirement                    |
