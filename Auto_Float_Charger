@@ -61,7 +61,6 @@ psu.write(f"VOLT {FLOAT_VOLTAGE}")
 print(f"[{datetime.now().strftime('%H:%M:%S')}] Now in float mode at {FLOAT_VOLTAGE}V")
 
 # Keep output on for float charging
-# You can optionally add a stop timer or monitor indefinitely
 try:
     while True:
         time.sleep(60)
